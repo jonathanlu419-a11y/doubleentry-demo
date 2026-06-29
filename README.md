@@ -10,11 +10,12 @@ A full-stack, double-entry accounting and multi-currency portfolio platform I bu
 
 A single application that combines proper double-entry bookkeeping with live investment tracking, so every dollar — cash, stocks, FX, and income — reconciles to the penny across three currencies.
 
-- **Double-entry journal engine** — balanced Dr/Cr entries, recurring entry templates with balance guards, transfers, and auto-numbering across every creation path.
+- **Double-entry journal engine** — balanced Dr/Cr entries, recurring entry templates (with balance guards and optional payee carry-through), transfers, bulk debit-account reassignment across selected entries, and auto-numbering across every creation path.
 - **Multi-currency accounting (CAD / USD / HKD)** — penny-exact reconciliation in both native and CAD-accounted terms, with FX rates sourced from the Bank of Canada.
 - **Stock portfolio tracking** — average-cost-basis (ACB) engine with position resets at net-zero boundaries, short-selling support (open/cover branches), and per-broker × currency × account-type holding granularity.
 - **Brokerage CSV import** — a guided import wizard with fuzzy matching, duplicate detection, a searchable category combobox, and ticker normalization.
-- **Smart data entry** — context-aware description autofill and ghost-text typeahead suggestions to speed up journal entry.
+- **Smart data entry** — context-aware description autofill, ghost-text typeahead suggestions, and per-category icons for faster visual scanning, to speed up journal entry.
+- **Dashboards & insights** — at-a-glance net worth alongside a rolling 30-day net-cashflow summary (income vs. expenses), spending breakdowns, and asset allocation.
 - **Technical analysis** — indicators including Chandelier Exit (Wilder/RMA ATR) surfaced on a dashboard.
 - **Reconciliation tooling** — Big-4-style audit workpaper outputs and a zero-difference reconciliation standard enforced simultaneously in native and CAD currencies.
 
