@@ -4,6 +4,9 @@ import cors from 'cors';
 import { pool } from './db/pool';
 import { sessionMiddleware } from './middleware/session';
 import { sessionRouter } from './routes/session';
+import { accountsRouter } from './routes/accounts';
+import { categoriesRouter, incomeSourcesRouter } from './routes/lookups';
+import { shortcutsRouter } from './routes/shortcuts';
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3001;
@@ -30,6 +33,10 @@ app.get('/api/health', async (_req, res) => {
 // Everything below /api is session-scoped.
 app.use('/api', sessionMiddleware);
 app.use('/api', sessionRouter);
+app.use('/api', accountsRouter);
+app.use('/api', categoriesRouter);
+app.use('/api', incomeSourcesRouter);
+app.use('/api', shortcutsRouter);
 
 // Centralised error handler — repos/routes call next(err); we log and return 500.
 app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
