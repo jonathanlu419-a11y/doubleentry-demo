@@ -16,6 +16,11 @@ accountsRouter.get('/accounts', ah(async (req, res) => {
   res.json(await accountRepo.list(req.sessionId));
 }));
 
+// Registered before any '/accounts/:id' param route so 'balances' isn't parsed as an id.
+accountsRouter.get('/accounts/balances', ah(async (req, res) => {
+  res.json(await accountRepo.listWithBalances(req.sessionId));
+}));
+
 accountsRouter.post('/accounts', ah(async (req, res) => {
   const parsed = accountSchema.safeParse(req.body);
   if (!parsed.success) return badRequest(res, parsed.error.issues[0].message);

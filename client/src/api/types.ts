@@ -10,6 +10,10 @@ export interface Account {
   created_at: string;
 }
 
+export interface AccountBalance extends Account {
+  balance_cents: number;
+}
+
 export interface Lookup {
   id: number;
   name: string;

@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { api } from './client';
-import type { Account, Category, IncomeSource, JournalEntry, Shortcut, Side } from './types';
+import type { Account, AccountBalance, Category, IncomeSource, JournalEntry, Shortcut, Side } from './types';
 
 // ── Query keys ────────────────────────────────────────────────────────────────
 export const qk = {
@@ -9,6 +9,7 @@ export const qk = {
   incomeSources: ['income-sources'] as const,
   shortcuts: ['shortcuts'] as const,
   entries: ['entries'] as const,
+  balances: ['balances'] as const,
 };
 
 function invalidate(qc: QueryClient, keys: readonly (readonly string[])[]): void {
@@ -20,12 +21,15 @@ export type AccountInput = Pick<Account, 'code' | 'name' | 'nature' | 'starting_
 
 export const useAccounts = () => useQuery({ queryKey: qk.accounts, queryFn: () => api.get<Account[]>('/accounts') });
 
+export const useBalances = () =>
+  useQuery({ queryKey: qk.balances, queryFn: () => api.get<AccountBalance[]>('/accounts/balances') });
+
 export function useSaveAccount() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (v: { id?: number; data: AccountInput }) =>
       v.id ? api.put<Account>(`/accounts/${v.id}`, v.data) : api.post<Account>('/accounts', v.data),
-    onSuccess: () => invalidate(qc, [qk.accounts, qk.shortcuts]),
+    onSuccess: () => invalidate(qc, [qk.accounts, qk.balances, qk.shortcuts]),
   });
 }
 
@@ -33,7 +37,7 @@ export function useDeleteAccount() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: number) => api.del(`/accounts/${id}`),
-    onSuccess: () => invalidate(qc, [qk.accounts, qk.shortcuts]),
+    onSuccess: () => invalidate(qc, [qk.accounts, qk.balances, qk.shortcuts]),
   });
 }
 
@@ -133,7 +137,7 @@ export function useSaveEntry() {
   return useMutation({
     mutationFn: (v: { id?: number; data: EntryInput }) =>
       v.id ? api.put<JournalEntry>(`/entries/${v.id}`, v.data) : api.post<JournalEntry>('/entries', v.data),
-    onSuccess: () => invalidate(qc, [qk.entries]),
+    onSuccess: () => invalidate(qc, [qk.entries, qk.balances]),
   });
 }
 
@@ -141,6 +145,6 @@ export function useDeleteEntry() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: number) => api.del(`/entries/${id}`),
-    onSuccess: () => invalidate(qc, [qk.entries]),
+    onSuccess: () => invalidate(qc, [qk.entries, qk.balances]),
   });
 }

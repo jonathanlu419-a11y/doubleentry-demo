@@ -18,6 +18,10 @@ export interface AccountInput {
   starting_balance_cents?: number;
 }
 
+export interface AccountBalanceRow extends AccountRow {
+  balance_cents: number;
+}
+
 
 export const accountRepo = {
   list(sessionId: string): Promise<AccountRow[]> {
@@ -31,6 +35,29 @@ export const accountRepo = {
 
   getById(sessionId: string, id: number): Promise<AccountRow | undefined> {
     return queryOne<AccountRow>('SELECT * FROM accounts WHERE session_id = $1 AND id = $2', [sessionId, id]);
+  },
+
+  /**
+   * Every account with its running balance from posted lines, nature-aware:
+   *   net = Σdebit − Σcredit
+   *   debit-normal (Asset/Expense):  balance = starting + net
+   *   credit-normal (Liability/Revenue): balance = starting − net
+   */
+  listWithBalances(sessionId: string): Promise<AccountBalanceRow[]> {
+    return query<AccountBalanceRow>(
+      `SELECT a.*,
+              (a.starting_balance_cents
+               + COALESCE(SUM(CASE WHEN l.side = 'debit' THEN l.amount_cents ELSE -l.amount_cents END), 0)
+                 * CASE WHEN a.nature IN ('Asset', 'Expense') THEN 1 ELSE -1 END
+              )::bigint AS balance_cents
+       FROM accounts a
+       LEFT JOIN journal_lines l ON l.account_id = a.id AND l.session_id = a.session_id
+       WHERE a.session_id = $1
+       GROUP BY a.id
+       ORDER BY CASE a.nature WHEN 'Asset' THEN 0 WHEN 'Liability' THEN 1 WHEN 'Revenue' THEN 2 ELSE 3 END,
+                a.code NULLS LAST, a.name`,
+      [sessionId],
+    );
   },
 
   create(sessionId: string, dto: AccountInput): Promise<AccountRow | undefined> {
