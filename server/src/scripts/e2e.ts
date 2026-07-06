@@ -1,0 +1,168 @@
+/**
+ * HTTP e2e smoke against a locally-running server (npm run dev). Uses Node fetch and
+ * manual cookie handling — no shell pipes. Verifies fresh-session auto-seed, Settings
+ * CRUD, and the 409 referenced-account delete guard. Run: `npm run e2e` (server must be up).
+ */
+const BASE = process.env.E2E_BASE ?? 'http://localhost:3001';
+let cookie = '';
+
+async function call(method: string, path: string, body?: unknown) {
+  const res = await fetch(`${BASE}${path}`, {
+    method,
+    headers: {
+      ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+      ...(cookie ? { Cookie: cookie } : {}),
+    },
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  });
+  const setCookie = res.headers.getSetCookie?.() ?? [];
+  const sid = setCookie.map((c) => c.split(';')[0]).find((c) => c.startsWith('sid='));
+  if (sid) cookie = sid;
+  const text = await res.text();
+  return { status: res.status, body: text ? JSON.parse(text) : null };
+}
+
+function assert(cond: boolean, msg: string): void {
+  if (!cond) throw new Error(`ASSERT FAILED: ${msg}`);
+  console.log(`  ✓ ${msg}`);
+}
+
+async function main(): Promise<void> {
+  console.log('[e2e] fresh visitor bootstrap');
+  const sess = await call('GET', '/api/session');
+  assert(sess.status === 200 && sess.body.ok === true, 'GET /api/session → 200 ok');
+  assert(cookie.startsWith('sid='), 'session cookie captured');
+
+  console.log('[e2e] auto-seeded counts');
+  const accounts = await call('GET', '/api/accounts');
+  assert(accounts.body.length === 7, `accounts = 7 (got ${accounts.body.length})`);
+  for (const [e, n] of [['categories', 6], ['income-sources', 4], ['shortcuts', 4]] as const) {
+    const r = await call('GET', `/api/${e}`);
+    assert(r.body.length === n, `${e} = ${n} (got ${r.body.length})`);
+  }
+
+  console.log('[e2e] 409 referenced-account delete guard');
+  const chequing = accounts.body.find((a: { name: string }) => a.name === 'Chequing');
+  const delRef = await call('DELETE', `/api/accounts/${chequing.id}`);
+  assert(delRef.status === 409, `delete referenced Chequing → 409 (got ${delRef.status})`);
+  assert(/cannot be deleted/i.test(delRef.body.error), 'friendly error message returned');
+
+  console.log('[e2e] create / update / delete lifecycle');
+  const created = await call('POST', '/api/accounts', { name: 'Scratch', nature: 'Expense', starting_balance_cents: 0 });
+  assert(created.status === 201 && created.body.id > 0, 'create → 201 with id');
+  const updated = await call('PUT', `/api/accounts/${created.body.id}`, { name: 'Scratch2', nature: 'Expense', starting_balance_cents: 500 });
+  assert(updated.body.name === 'Scratch2' && updated.body.starting_balance_cents === 500, 'update persisted');
+  const delOk = await call('DELETE', `/api/accounts/${created.body.id}`);
+  assert(delOk.status === 200 && delOk.body.ok === true, 'delete unreferenced → 200 ok');
+
+  console.log('[e2e] validation');
+  const bad = await call('POST', '/api/accounts', { name: '', nature: 'Asset' });
+  assert(bad.status === 400, `empty name → 400 (got ${bad.status})`);
+
+  console.log('[e2e] shortcut reorder');
+  const sc = await call('GET', '/api/shortcuts');
+  const reversed = [...sc.body].reverse().map((s: { id: number }) => s.id);
+  await call('POST', '/api/shortcuts/reorder', { ids: reversed });
+  const sc2 = await call('GET', '/api/shortcuts');
+  assert(sc2.body[0].id === reversed[0], 'reorder persisted (first id matches new order)');
+
+  console.log('[e2e] journal entries — balance core');
+  const chq = accounts.body.find((a: { id: number; name: string }) => a.name === 'Chequing');
+  const sal = accounts.body.find((a: { id: number; name: string }) => a.name === 'Salary');
+  const seeded = await call('GET', '/api/entries');
+  assert(seeded.body.length === 5, `seeded entries = 5 (got ${seeded.body.length})`);
+
+  const base = { entry_date: '2026-07-01', description: 'e2e pay', payee: 'X', category_id: null, income_source_id: null };
+  const jeCreated = await call('POST', '/api/entries', {
+    ...base,
+    lines: [{ account_id: chq.id, side: 'debit', amount_cents: 12345 }, { account_id: sal.id, side: 'credit', amount_cents: 12345 }],
+  });
+  assert(jeCreated.status === 201 && jeCreated.body.lines.length === 2, 'create balanced entry → 201');
+
+  const ub = await call('POST', '/api/entries', {
+    ...base,
+    lines: [{ account_id: chq.id, side: 'debit', amount_cents: 100 }, { account_id: sal.id, side: 'credit', amount_cents: 200 }],
+  });
+  assert(ub.status === 400 && /unbalanced/i.test(ub.body.error), 'unbalanced entry → 400');
+
+  const single = await call('POST', '/api/entries', { ...base, lines: [{ account_id: chq.id, side: 'debit', amount_cents: 100 }] });
+  assert(single.status === 400, 'single-line entry → 400');
+
+  const foreign = await call('POST', '/api/entries', {
+    ...base,
+    lines: [{ account_id: 999999, side: 'debit', amount_cents: 100 }, { account_id: sal.id, side: 'credit', amount_cents: 100 }],
+  });
+  assert(foreign.status === 400 && /invalid/i.test(foreign.body.error), 'foreign/invalid account → 400');
+
+  const edited = await call('PUT', `/api/entries/${jeCreated.body.id}`, {
+    ...base, description: 'e2e edited',
+    lines: [{ account_id: chq.id, side: 'debit', amount_cents: 5000 }, { account_id: sal.id, side: 'credit', amount_cents: 5000 }],
+  });
+  assert(edited.body.description === 'e2e edited' && edited.body.lines.length === 2, 'edit persisted');
+
+  const delE = await call('DELETE', `/api/entries/${jeCreated.body.id}`);
+  assert(delE.status === 200, 'delete entry → 200');
+  const after = await call('GET', '/api/entries');
+  assert(after.body.length === 5, `back to 5 entries (got ${after.body.length})`);
+
+  console.log('[e2e] session isolation');
+  const s1ids = new Set(after.body.map((e: { id: number }) => e.id));
+  cookie = ''; // force a brand-new visitor
+  await call('GET', '/api/session');
+  const s2 = await call('GET', '/api/entries');
+  assert(s2.body.length === 5, 'second visitor has its own 5 entries');
+  assert(s2.body.every((e: { id: number }) => !s1ids.has(e.id)), 'session isolation: no shared entry ids');
+
+  // Balances computed against the pristine seed of this fresh session (values hand-derived
+  // from the seed entries; verifies the nature-aware Dr/Cr signing + starting balances).
+  console.log('[e2e] account balances (nature-aware)');
+  const bals = await call('GET', '/api/accounts/balances');
+  const bmap: Record<string, number> = Object.fromEntries(
+    bals.body.map((a: { name: string; balance_cents: number }) => [a.name, a.balance_cents]),
+  );
+  const expected: Record<string, number> = {
+    Chequing: 341450, Savings: 1050000, 'Credit Card': 4200,
+    Salary: 300000, Groceries: 8550, Rent: 150000, Dining: 4200,
+  };
+  for (const [name, val] of Object.entries(expected)) {
+    assert(bmap[name] === val, `${name} balance = ${val} (got ${bmap[name]})`);
+  }
+  const sum = (nature: string) =>
+    bals.body.filter((a: { nature: string }) => a.nature === nature)
+      .reduce((s: number, a: { balance_cents: number }) => s + a.balance_cents, 0);
+  assert(sum('Asset') - sum('Liability') === 1387250, `net worth = 1387250 (got ${sum('Asset') - sum('Liability')})`);
+  assert(sum('Revenue') - sum('Expense') === 137250, `net income = 137250 (got ${sum('Revenue') - sum('Expense')})`);
+
+  // Quick Add semantics: the seeded Expense shortcut must debit the expense account and
+  // credit cash. Post an entry from its defaults and check both balances move correctly.
+  console.log('[e2e] quick add via shortcut defaults');
+  const sc3 = await call('GET', '/api/shortcuts');
+  const exp = sc3.body.find((s: { kind: string }) => s.kind === 'expense');
+  const accts2 = await call('GET', '/api/accounts');
+  const nameOf = (id: number) => accts2.body.find((a: { id: number }) => a.id === id)?.name;
+  assert(nameOf(exp.default_account_id) === 'Groceries', 'expense shortcut debits Groceries');
+  assert(nameOf(exp.default_counter_account_id) === 'Chequing', 'expense shortcut credits Chequing');
+
+  const qa = await call('POST', '/api/entries', {
+    entry_date: '2026-07-02', description: 'qa coffee', payee: null,
+    category_id: exp.default_category_id, income_source_id: exp.default_income_source_id,
+    lines: [
+      { account_id: exp.default_account_id, side: 'debit', amount_cents: 1000 },
+      { account_id: exp.default_counter_account_id, side: 'credit', amount_cents: 1000 },
+    ],
+  });
+  assert(qa.status === 201, 'quick-add entry posted → 201');
+  const bals2 = await call('GET', '/api/accounts/balances');
+  const bmap2: Record<string, number> = Object.fromEntries(
+    bals2.body.map((a: { name: string; balance_cents: number }) => [a.name, a.balance_cents]),
+  );
+  assert(bmap2['Groceries'] === expected['Groceries'] + 1000, `Groceries +$10 (got ${bmap2['Groceries']})`);
+  assert(bmap2['Chequing'] === expected['Chequing'] - 1000, `Chequing −$10 (got ${bmap2['Chequing']})`);
+
+  console.log('\n[e2e] PASS');
+}
+
+main().catch((err) => {
+  console.error('\n[e2e] FAIL:', err.message);
+  process.exit(1);
+});

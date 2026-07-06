@@ -3,6 +3,7 @@ import { NavLink } from 'react-router-dom';
 import { Wallet, BookOpen, Settings as SettingsIcon, RotateCcw } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
+import QuickAdd from './QuickAdd';
 
 const NAV = [
   { to: '/', label: 'Balances', icon: Wallet, end: true },
@@ -43,6 +44,7 @@ export default function Layout({ children }: { children: ReactNode }) {
         </button>
       </header>
       <main className="main">{children}</main>
+      <QuickAdd />
     </div>
   );
 }

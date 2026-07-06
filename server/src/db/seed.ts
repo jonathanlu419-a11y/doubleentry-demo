@@ -94,8 +94,13 @@ async function insertStarterData(client: PoolClient, sessionId: string): Promise
   }
 
   // ── Quick Add shortcuts (visitor can edit these later) ──────────────────────
+  // Convention: `account` = the DEBIT leg, `counter` = the CREDIT leg.
+  //   expense:      Dr Groceries (expense up)   / Cr Chequing (cash down)
+  //   income:       Dr Chequing (cash up)       / Cr Salary (revenue up)
+  //   transfer:     Dr Savings (to)             / Cr Chequing (from)
+  //   card_payment: Dr Credit Card (debt down)  / Cr Chequing (cash down)
   const shortcutRows = [
-    { label: 'Expense', icon: 'shopping-cart', kind: 'expense', account: 'Chequing', counter: 'Groceries', category: 'Groceries', income: null, sort: 0 },
+    { label: 'Expense', icon: 'shopping-cart', kind: 'expense', account: 'Groceries', counter: 'Chequing', category: 'Groceries', income: null, sort: 0 },
     { label: 'Income', icon: 'banknote', kind: 'income', account: 'Chequing', counter: 'Salary', category: 'Salary', income: 'Employment', sort: 1 },
     { label: 'Transfer', icon: 'arrow-left-right', kind: 'transfer', account: 'Savings', counter: 'Chequing', category: 'Transfer', income: null, sort: 2 },
     { label: 'Card Payment', icon: 'credit-card', kind: 'card_payment', account: 'Credit Card', counter: 'Chequing', category: null, income: null, sort: 3 },
