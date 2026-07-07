@@ -1,4 +1,4 @@
-# Your Finance Manager
+# DoubleEntry
 
 A real, running full-stack double-entry accounting demo — **[live app](https://your-finance-manager-demo.onrender.com)**.
 

@@ -34,7 +34,7 @@ export default function Layout({ children }: { children: ReactNode }) {
   return (
     <div className="shell">
       <header className="topbar">
-        <div className="brand">Your Finance Manager</div>
+        <div className="brand">DoubleEntry</div>
         <nav className="nav">
           {NAV.map((n) => (
             <NavLink key={n.to} to={n.to} end={n.end} className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}>
