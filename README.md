@@ -1,74 +1,47 @@
 # Finance & Portfolio Manager
 
-A full-stack, double-entry accounting and multi-currency portfolio platform I built from scratch to manage real personal finances across Canadian, US, and Hong Kong markets.
+A real, running full-stack double-entry accounting demo — **[live app](https://your-finance-manager-demo.onrender.com)**.
 
-> **Note:** This is a showcase repository. The source code is private. This page documents the system's design, features, and the development workflow behind it.
+This is a deliberately simplified public rewrite of a larger private finance platform I use daily. It is not a mock: every figure on screen is computed from balanced journal entries stored in Postgres.
 
----
+## Try it
 
-## What it does
+No sign-up. On first visit you get an anonymous private workspace (an httpOnly session cookie) pre-loaded with realistic starter data — accounts, categories, and balanced sample entries. Everything you do is isolated to your session, and **Reset demo** restores the starter dataset at any time.
 
-A single application that combines proper double-entry bookkeeping with live investment tracking, so every dollar — cash, stocks, FX, and income — reconciles to the penny across three currencies.
+> ⏱ Hosted on a free tier: the first visit after idle can take ~30–60 s to cold-start.
 
-- **Double-entry journal engine** — balanced Dr/Cr entries, recurring entry templates (with balance guards and optional payee carry-through), transfers, bulk debit-account reassignment across selected entries, and auto-numbering across every creation path.
-- **Multi-currency accounting (CAD / USD / HKD)** — penny-exact reconciliation in both native and CAD-accounted terms, with FX rates sourced from the Bank of Canada.
-- **Stock portfolio tracking** — average-cost-basis (ACB) engine with position resets at net-zero boundaries, short-selling support (open/cover branches), and per-broker × currency × account-type holding granularity.
-- **Brokerage CSV import** — a guided import wizard with fuzzy matching, duplicate detection, a searchable category combobox, and ticker normalization.
-- **Smart data entry** — context-aware description autofill, ghost-text typeahead suggestions, and per-category icons for faster visual scanning, to speed up journal entry.
-- **Dashboards & insights** — at-a-glance net worth alongside a rolling 30-day net-cashflow summary (income vs. expenses), spending breakdowns, and asset allocation.
-- **Technical analysis** — indicators including Chandelier Exit (Wilder/RMA ATR) surfaced on a dashboard.
-- **Reconciliation tooling** — Big-4-style audit workpaper outputs and a zero-difference reconciliation standard enforced simultaneously in native and CAD currencies.
+## Features
 
----
+- **Quick Add** — a floating action button with user-definable shortcuts (Expense, Income, Transfer, Card Payment). One tap posts a real balanced Dr/Cr journal entry.
+- **Journal Entries** — list, create, and edit multi-line entries with a live balance check: the form won't submit until debits equal credits, and the server independently re-validates.
+- **CSV Import** — upload a bank export, map columns (auto-suggested), and review rows in four tabs — Ready / Needs review / Duplicates / Errors — with fuzzy account matching (exact → substring → Levenshtein) and in-file duplicate detection. Each imported row is validated independently server-side.
+- **Account Balances** — nature-aware running balances (Asset/Expense debit-normal, Liability/Revenue credit-normal) computed from posted lines, with net-worth and net-income roll-ups.
+- **Settings** — full CRUD for the chart of accounts, categories, income sources, and Quick Add shortcuts.
 
-## Tech stack
+## How the no-login model works
 
-| Layer | Technology |
+A random session id in an httpOnly `SameSite=Lax` cookie is the entire auth story. Every table carries `session_id`; every query filters by it. New session → auto-seeded starter data. There are no user accounts, no passwords, and no personal data.
+
+## Tech
+
+| Layer | Choice |
 |---|---|
-| Frontend | React + TypeScript |
-| Backend | Node.js + TypeScript |
-| Testing | Jest, Vitest |
-| Deployment | Render |
-| Integrations | Questrade & Futu OAuth, Bank of Canada FX |
+| Frontend | React 18 + TypeScript + Vite, TanStack Query |
+| Backend | Node + Express + TypeScript, Zod validation |
+| Database | Postgres (Neon) — money stored as integer cents |
+| Hosting | Render (single service serves the SPA + API) |
 
----
+Double-entry integrity is enforced in one place (`server/src/domain/balance.ts`): ≥ 2 lines, positive integer-cent amounts, and Σdebits === Σcredits exactly — no floating point, no rounding tolerance.
 
-## Engineering practices
+## Run locally
 
-The codebase is held to a strict quality gate. Every commit must pass **five green checks** before it lands:
+```bash
+npm install
+cp server/.env.example server/.env   # add your Postgres URL
+npm run migrate
+npm run dev                          # client :5173 (proxies /api) + server :3001
+```
 
-1. Server TypeScript compile
-2. Client TypeScript compile
-3. Jest canary suite
-4. Client production build
-5. Vitest unit suite
+## Relation to the private app
 
-Other standing rules: path-scoped commits, separate code and documentation commits, and dedicated session-documentation artifacts (backlog, schedule, project guide).
-
----
-
-## How it was built — a two-agent AI workflow
-
-This project was developed using a disciplined **planner / executor** workflow with two AI agents:
-
-- A **planner** turns intent into precise, scoped engineering prompts.
-- An **executor** implements them commit-by-commit, enforcing the five-green gate before every commit.
-
-This separation kept changes small, reviewable, and reversible, and turned a large solo build into a steady, auditable sprint.
-
----
-
-## Background
-
-I'm a software developer in Toronto with a background in financial planning and audit methodology. I built this app over many months to solve my own multi-currency, multi-broker bookkeeping problem — and to demonstrate that I can take a complex domain (double-entry accounting + investment tracking) from architecture to a tested, deployed product.
-
----
-
-## Contact
-
-Jonathan Lu
-jonathanlu419@gmail.com
-
----
-
-*Screenshots and a feature walkthrough coming soon.*
+The full private version adds multi-currency (CAD/USD/HKD) reconciliation, an ACB stock-portfolio engine, brokerage imports, recurring entries, and dashboards. This repo shares no code with it — it's a clean-room rewrite of the core bookkeeping ideas at a fraction of the scope.
