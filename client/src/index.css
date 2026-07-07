@@ -166,6 +166,25 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
 .group-total { font-weight: 700; }
 .table.compact td { padding: 6px 8px; }
 
+/* ── CSV import wizard ──────────────────────────────────────── */
+.modal-wide { max-width: 860px; }
+.upload-zone {
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  padding: 40px 20px; border: 2px dashed var(--border); border-radius: var(--radius);
+  color: var(--text-2); cursor: pointer; text-align: center;
+}
+.upload-zone:hover { border-color: var(--accent); color: var(--text-1); }
+.upload-zone p { margin: 0; }
+.map-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; }
+.bulk-row { display: flex; gap: 8px; margin-bottom: 8px; }
+.review-scroll { max-height: 46vh; overflow-y: auto; }
+.row-skipped { opacity: 0.45; }
+.neg-text { color: var(--danger); }
+.ok-text { color: var(--success); }
+.done-summary { text-align: center; padding: 12px 0; }
+.done-summary h3 { margin: 8px 0; }
+.done-summary ul { text-align: left; max-height: 30vh; overflow-y: auto; }
+
 /* ── Quick Add ──────────────────────────────────────────────── */
 .fab {
   position: fixed; right: 24px; bottom: 24px; z-index: 50;

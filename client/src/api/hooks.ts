@@ -148,3 +148,16 @@ export function useDeleteEntry() {
     onSuccess: () => invalidate(qc, [qk.entries, qk.balances]),
   });
 }
+
+export interface ImportResult {
+  imported: number;
+  errors: { index: number; error: string }[];
+}
+
+export function useImportEntries() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (entries: EntryInput[]) => api.post<ImportResult>('/entries/import', { entries }),
+    onSuccess: () => invalidate(qc, [qk.entries, qk.balances]),
+  });
+}

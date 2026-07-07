@@ -4,6 +4,7 @@ import { useEntries, useDeleteEntry } from '../api/hooks';
 import type { JournalEntry } from '../api/types';
 import { formatCents } from '../lib/money';
 import JournalEntryForm from './journal/JournalEntryForm';
+import CsvImportModal from './journal/CsvImportModal';
 
 /** "Chequing → Groceries" style flow summary from an entry's lines. */
 function flow(e: JournalEntry): string {
@@ -23,6 +24,7 @@ export default function JournalPage() {
   const { data: entries = [], isLoading } = useEntries();
   const del = useDeleteEntry();
   const [form, setForm] = useState<{ open: boolean; entry: JournalEntry | null }>({ open: false, entry: null });
+  const [importOpen, setImportOpen] = useState(false);
 
   async function remove(e: JournalEntry) {
     if (!window.confirm(`Delete this entry from ${e.entry_date}?`)) return;
@@ -34,7 +36,7 @@ export default function JournalPage() {
       <div className="page-head">
         <h1>Journal Entries</h1>
         <div className="row-actions">
-          <button className="btn ghost" disabled title="CSV import — built in the next step"><FileDown size={15} /> Import CSV</button>
+          <button className="btn ghost" onClick={() => setImportOpen(true)}><FileDown size={15} /> Import CSV</button>
           <button className="btn primary" onClick={() => setForm({ open: true, entry: null })}><Plus size={15} /> New entry</button>
         </div>
       </div>
@@ -80,6 +82,7 @@ export default function JournalPage() {
       </div>
 
       {form.open && <JournalEntryForm entry={form.entry} onClose={() => setForm({ open: false, entry: null })} />}
+      {importOpen && <CsvImportModal onClose={() => setImportOpen(false)} />}
     </div>
   );
 }

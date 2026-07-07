@@ -64,6 +64,33 @@ entriesRouter.put('/entries/:id', ah(async (req, res) => {
   res.json(row);
 }));
 
+// Bulk CSV import. Each row is validated and inserted independently — one bad row
+// reports an error at its index but never aborts the batch (per-row isolation).
+const importSchema = z.object({ entries: z.array(entrySchema).min(1).max(1000) });
+
+entriesRouter.post('/entries/import', ah(async (req, res) => {
+  const parsed = importSchema.safeParse(req.body);
+  if (!parsed.success) return badRequest(res, parsed.error.issues[0].message);
+
+  let imported = 0;
+  const errors: { index: number; error: string }[] = [];
+  for (let i = 0; i < parsed.data.entries.length; i++) {
+    const dto = parsed.data.entries[i] as EntryInput;
+    try {
+      const err = await validate(req.sessionId, dto);
+      if (err) {
+        errors.push({ index: i, error: err });
+        continue;
+      }
+      await entryRepo.create(req.sessionId, dto);
+      imported++;
+    } catch (e) {
+      errors.push({ index: i, error: (e as Error).message });
+    }
+  }
+  res.json({ imported, errors });
+}));
+
 entriesRouter.delete('/entries/:id', ah(async (req, res) => {
   const id = parseId(req.params.id);
   if (!id) return badRequest(res, 'Invalid id');

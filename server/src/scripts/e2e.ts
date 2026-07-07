@@ -159,6 +159,40 @@ async function main(): Promise<void> {
   assert(bmap2['Groceries'] === expected['Groceries'] + 1000, `Groceries +$10 (got ${bmap2['Groceries']})`);
   assert(bmap2['Chequing'] === expected['Chequing'] - 1000, `Chequing −$10 (got ${bmap2['Chequing']})`);
 
+  // Bulk import: one batch mixing valid, unbalanced, and foreign-account rows must
+  // import the good rows and report per-index errors for the bad ones (no batch abort).
+  console.log('[e2e] CSV bulk import — per-row isolation');
+  const grocId = accts2.body.find((a: { name: string }) => a.name === 'Groceries').id;
+  const chqId = accts2.body.find((a: { name: string }) => a.name === 'Chequing').id;
+  const mk = (cents: number, debit: number, credit: number, extra?: object) => ({
+    entry_date: '2026-07-03', description: 'imported row', payee: null,
+    category_id: null, income_source_id: null,
+    lines: [
+      { account_id: debit, side: 'debit', amount_cents: cents },
+      { account_id: credit, side: 'credit', amount_cents: cents },
+    ],
+    ...extra,
+  });
+  const badBalance = mk(1000, grocId, chqId);
+  badBalance.lines[1].amount_cents = 999; // unbalance row 1
+  const imp = await call('POST', '/api/entries/import', {
+    entries: [
+      mk(2500, grocId, chqId),          // valid
+      badBalance,                        // unbalanced → error @1
+      mk(1000, 999999, chqId),           // foreign account → error @2
+      mk(4000, chqId, grocId),           // valid
+    ],
+  });
+  assert(imp.status === 200, 'import batch → 200');
+  assert(imp.body.imported === 2, `imported 2 of 4 (got ${imp.body.imported})`);
+  assert(imp.body.errors.length === 2, `2 per-row errors (got ${imp.body.errors.length})`);
+  assert(
+    imp.body.errors.map((e: { index: number }) => e.index).join(',') === '1,2',
+    'errors at indexes 1 and 2',
+  );
+  const entriesAfterImport = await call('GET', '/api/entries');
+  assert(entriesAfterImport.body.length === 8, `entries now 8 (5 seed + qa + 2 imported; got ${entriesAfterImport.body.length})`);
+
   console.log('\n[e2e] PASS');
 }
 
